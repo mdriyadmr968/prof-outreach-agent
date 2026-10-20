@@ -58,6 +58,32 @@ export async function POST(req: NextRequest) {
       // Get recent works
       const works = await OpenAlexService.getRecentWorks(author.id, 3);
 
+      // Check if author already exists in local database (CRM deduplication check)
+      const existingInDb = await prisma.professor.findFirst({
+        where: {
+          OR: [
+            { openAlexId: author.id },
+            ...(author.orcid ? [{ orcidId: author.orcid }] : []),
+            {
+              AND: [
+                { universityId: university.id },
+                { name: { equals: author.displayName, mode: "insensitive" } },
+              ],
+            },
+          ],
+        },
+        include: {
+          outreach: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+        },
+      });
+
+      const alreadyInCrm = Boolean(existingInDb);
+      const crmOutreachStatus = existingInDb?.outreach?.[0]?.status || (alreadyInCrm ? "IN_CRM" : null);
+      const crmProfileUrl = existingInDb?.profileUrl || undefined;
+
       discoveredProfessors.push({
         openAlexId: author.id,
         name: author.displayName,
@@ -68,6 +94,9 @@ export async function POST(req: NextRequest) {
         country: university.country,
         outreachArchetype: university.outreachArchetype,
         topics: author.topics.map((t) => t.displayName),
+        alreadyInCrm,
+        crmOutreachStatus,
+        crmProfileUrl,
         recentPublications: works.map((w) => ({
           title: w.title,
           year: w.publicationYear,

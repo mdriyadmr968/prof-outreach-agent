@@ -19,6 +19,9 @@ interface DiscoveredAuthor {
   country: string;
   outreachArchetype: string;
   topics: string[];
+  alreadyInCrm?: boolean;
+  crmOutreachStatus?: string | null;
+  crmProfileUrl?: string;
   recentPublications: {
     title: string;
     year: number;
@@ -194,13 +197,20 @@ export default function DiscoverPage() {
                     </div>
                   </div>
 
-                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100 shrink-0">
-                    {author.outreachArchetype === "PROFESSOR_LED"
-                      ? "Lab Funding"
-                      : author.outreachArchetype === "CENTRAL_HIWI"
-                      ? "Tuition-Free + HiWi"
-                      : "Scholarship Track"}
-                  </span>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100">
+                      {author.outreachArchetype === "PROFESSOR_LED"
+                        ? "Lab Funding"
+                        : author.outreachArchetype === "CENTRAL_HIWI"
+                        ? "Tuition-Free + HiWi"
+                        : "Scholarship Track"}
+                    </span>
+                    {author.alreadyInCrm && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
+                        In CRM ({author.crmOutreachStatus})
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Research Topics */}
@@ -236,10 +246,10 @@ export default function DiscoverPage() {
                   </span>
 
                   <Link
-                    href={`/analyze?name=${encodeURIComponent(author.name)}&university=${encodeURIComponent(author.university)}&country=${encodeURIComponent(author.country)}`}
+                    href={`/analyze?name=${encodeURIComponent(author.name)}&university=${encodeURIComponent(author.university)}&country=${encodeURIComponent(author.country)}${author.crmProfileUrl ? `&url=${encodeURIComponent(author.crmProfileUrl)}` : ""}`}
                     className="inline-flex items-center space-x-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
                   >
-                    <span>Analyze &amp; Draft Email</span>
+                    <span>{author.alreadyInCrm ? "View / Update Analysis" : "Analyze & Draft Email"}</span>
                     <ArrowRight className="w-3 h-3" />
                   </Link>
                 </div>

@@ -64,6 +64,7 @@ interface AnalysisResult {
   publications: PublicationItem[];
   outreach: {
     id: string;
+    status: string;
     subject: string;
     body: string;
     wordCount: number;
@@ -71,6 +72,7 @@ interface AnalysisResult {
     qualityPassed: boolean;
     qualityNotes: string[];
   };
+  pipelineNotice?: string;
 }
 
 function AnalyzeContent() {
@@ -299,6 +301,19 @@ function AnalyzeContent() {
       {/* Analysis Results View */}
       {result && (
         <div className="space-y-6">
+          {/* Pipeline Notice if already in CRM / Pipeline */}
+          {result.pipelineNotice && (
+            <div className="p-4 rounded-xl bg-blue-50 border border-blue-300 text-blue-900 text-xs flex items-start space-x-3 shadow-sm">
+              <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <span className="font-bold uppercase tracking-wider text-blue-800">
+                  Existing Pipeline Record Found
+                </span>
+                <p className="text-blue-800 font-medium">{result.pipelineNotice}</p>
+              </div>
+            </div>
+          )}
+
           {/* Prospective Student Easter Egg Warning Banner */}
           {result.professor.requiredSubjectTag && (
             <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs flex items-start space-x-3 shadow-sm">
@@ -533,35 +548,53 @@ function AnalyzeContent() {
             {/* Human Approval Action Bar */}
             <div className="pt-4 border-t border-slate-100 flex flex-wrap justify-between items-center gap-3">
               <span className="text-xs text-slate-500">
-                Explicit human approval required before sending.
+                {result.outreach.status === "DRAFT"
+                  ? "Explicit human approval required before sending."
+                  : `Outreach record is active in CRM pipeline (${result.outreach.status}).`}
               </span>
 
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={sending}
-                  onClick={() => handleSend()}
-                  className="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-md transition-colors"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{sending ? "Sending..." : "Approve & Send Now"}</span>
-                </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {result.outreach.status !== "DRAFT" ? (
+                  <div className="flex items-center space-x-3">
+                    <span className="text-xs px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 font-bold uppercase tracking-wide">
+                      Status: {result.outreach.status}
+                    </span>
+                    <a
+                      href="/outreach"
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline"
+                    >
+                      View in Outreach CRM →
+                    </a>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      disabled={sending}
+                      onClick={() => handleSend()}
+                      className="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-md transition-colors"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{sending ? "Sending..." : "Approve & Send Now"}</span>
+                    </button>
 
-                <button
-                  type="button"
-                  disabled={sending}
-                  onClick={() => {
-                    // Schedule for tomorrow 8:30 AM
-                    const d = new Date();
-                    d.setDate(d.getDate() + 1);
-                    d.setHours(8, 30, 0, 0);
-                    handleSend(d.toISOString());
-                  }}
-                  className="inline-flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs px-4 py-2.5 rounded-xl transition-colors"
-                >
-                  <Clock className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Queue for 8:30 AM (Prof Local Time)</span>
-                </button>
+                    <button
+                      type="button"
+                      disabled={sending}
+                      onClick={() => {
+                        // Schedule for tomorrow 8:30 AM
+                        const d = new Date();
+                        d.setDate(d.getDate() + 1);
+                        d.setHours(8, 30, 0, 0);
+                        handleSend(d.toISOString());
+                      }}
+                      className="inline-flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs px-4 py-2.5 rounded-xl transition-colors"
+                    >
+                      <Clock className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Queue for 8:30 AM (Prof Local Time)</span>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
