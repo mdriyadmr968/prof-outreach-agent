@@ -1,0 +1,272 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OutreachArchetype {
+  PROFESSOR_LED    // Canada, South Korea, Japan, USA Thesis-MS
+  CENTRAL_HIWI     // Germany, Austria
+  SCHOLARSHIP_LED  // Sweden, Finland, NL, Denmark, UK, Australia
+}
+
+enum AcceptingStatus {
+  CONFIRMED_OPEN
+  PHD_ONLY
+  NOT_ACCEPTING
+  PORTAL_ONLY
+  UNKNOWN
+}
+
+enum EmailConfidenceStatus {
+  VERIFIED_OFFICIAL
+  VERIFIED_UNIVERSITY_DIRECTORY
+  PROBABLE
+  UNVERIFIED
+  INVALID
+}
+
+enum OutreachStatus {
+  DRAFT
+  APPROVED
+  SENT
+  FOLLOW_UP_DUE
+  FOLLOW_UP_SENT
+  REPLY_RECEIVED
+  REJECTED
+  INTERESTED
+  INTERVIEW_SCHEDULED
+  FUNDING_DISCUSSION
+  APPLICATION_SUBMITTED
+  OFFER_RECEIVED
+  CLOSED
+}
+
+enum ReplyClassification {
+  POSITIVE_INTERESTED
+  REQUEST_FOR_CV
+  REQUEST_FOR_TRANSCRIPT
+  REQUEST_FOR_PROPOSAL
+  FUNDING_AVAILABLE
+  FUNDING_UNAVAILABLE
+  APPLY_THROUGH_PORTAL
+  NOT_ACCEPTING_STUDENTS
+  REJECTION
+  NEEDS_MORE_INFO
+  INTERVIEW_INVITATION
+  UNKNOWN
+}
+
+enum ChallengeStatus {
+  PENDING_AUTO
+  AUTO_SOLVED
+  AWAITING_USER
+  USER_SOLVED
+  FAILED
+  SKIPPED
+}
+
+model User {
+  id              String            @id @default(cuid())
+  name            String
+  email           String            @unique
+  country         String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  academicProfile AcademicProfile?
+  outreachHistory Outreach[]
+}
+
+model AcademicProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  degree             String
+  university         String
+  graduationYear     Int
+  cgpa               Float
+  cgpaScale          Float    @default(4.0)
+  ielts              Float?
+  toefl              Float?
+  thesisTitle        String
+  thesisAbstract     String?
+  thesisMethods      String[] // e.g. ["Machine Learning", "Deep Learning", "XGBoost", "ANN"]
+  skills             String[] // e.g. ["React", "Next.js", "Node.js", "TypeScript", "PostgreSQL", "Python"]
+  researchInterests  Json     // e.g. [{"name": "AI for Healthcare", "weight": 10}, {"name": "Machine Learning", "weight": 10}]
+  targetCountries    String[]
+  fullyFundedOnly    Boolean  @default(true)
+  acceptTuitionWaiver Boolean @default(true)
+  acceptPartialFunding Boolean @default(false)
+  acceptSelfFunded   Boolean  @default(false)
+  cvUrl              String?
+  cvText             String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model University {
+  id                 String            @id @default(cuid())
+  name               String            @unique
+  country            String
+  city               String?
+  website            String
+  domain             String?
+  outreachArchetype  OutreachArchetype @default(PROFESSOR_LED)
+  fundingInformation String?
+  applicationDeadlines Json?
+  professors         Professor[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+}
+
+model Professor {
+  id                     String                @id @default(cuid())
+  universityId           String
+  university             University            @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  name                   String
+  title                  String?               // e.g. "Associate Professor"
+  department             String?
+  email                  String?
+  emailConfidence        EmailConfidenceStatus @default(UNVERIFIED)
+  emailSourceUrl         String?
+  profileUrl             String
+  labUrl                 String?
+  labName                String?
+  researchInterests      String[]
+  researchSummary        String?
+  fundingEvidence        String?
+  fundingConfidence      String?               // e.g. "CONFIRMED", "STRONG", "POSSIBLE", "NONE"
+  supervisionInformation String?
+  acceptingMastersStatus AcceptingStatus       @default(UNKNOWN)
+  prospectiveStudentRules String?              // Instructions extracted from their personal/lab page
+  requiredSubjectTag     String?               // Special codeword or subject requirement
+  timezone               String?               @default("UTC")
+  openAlexId             String?
+  orcidId                String?
+  scholarUrl             String?
+  publications           Publication[]
+  opportunity            Opportunity?
+  outreach               Outreach[]
+  sources                Source[]
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  @@unique([name, universityId])
+}
+
+model Publication {
+  id          String    @id @default(cuid())
+  professorId String
+  professor   Professor @relation(fields: [professorId], references: [id], onDelete: Cascade)
+  title       String
+  year        Int?
+  venue       String?
+  url         String?
+  abstract    String?
+  relevanceReason String?
+  relevanceScore Float?
+  doi         String?
+  createdAt   DateTime  @default(now())
+}
+
+model Opportunity {
+  id                 String    @id @default(cuid())
+  professorId        String    @unique
+  professor          Professor @relation(fields: [professorId], references: [id], onDelete: Cascade)
+  researchScore      Float     @default(0) // max 30
+  technicalScore     Float     @default(0) // max 15
+  activityScore      Float     @default(0) // max 10
+  fundingScore       Float     @default(0) // max 20
+  supervisionScore   Float     @default(0) // max 10
+  internationalScore Float     @default(0) // max 5
+  programScore       Float     @default(0) // max 5
+  emailScore         Float     @default(0) // max 5
+  totalScore         Float     @default(0) // 0 - 100
+  tier               String    @default("C") // "A" (90-100), "B" (80-89), "C" (70-79), "D" (<70)
+  reasoning          String?
+  potentialConcerns  String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model Outreach {
+  id             String         @id @default(cuid())
+  userId         String
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  professorId    String
+  professor      Professor      @relation(fields: [professorId], references: [id], onDelete: Cascade)
+  emailTo        String
+  subject        String
+  body           String
+  mode           String         @default("BALANCED") // PROFESSOR_FIRST, FUNDING_FIRST, BALANCED
+  status         OutreachStatus @default(DRAFT)
+  sentAt         DateTime?
+  scheduledFor   DateTime?
+  followUpDate   DateTime?
+  followUpCount  Int            @default(0)
+  gmailThreadId  String?
+  rfcMessageId   String?
+  qualityPassed  Boolean        @default(true)
+  qualityNotes   String?
+  claimCitations Json?          // List of verified claims: [{ claim, sourceUrl, sourceQuote }]
+  attachments    String[]       @default([])
+  replies        Reply[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model Reply {
+  id                String              @id @default(cuid())
+  outreachId        String
+  outreach          Outreach            @relation(fields: [outreachId], references: [id], onDelete: Cascade)
+  receivedAt        DateTime            @default(now())
+  senderEmail       String
+  classification    ReplyClassification @default(UNKNOWN)
+  contentSummary    String?
+  fullBody          String?
+  suggestedResponse String?
+  isImportant       Boolean             @default(false)
+  handled           Boolean             @default(false)
+}
+
+model Source {
+  id          String    @id @default(cuid())
+  professorId String
+  professor   Professor @relation(fields: [professorId], references: [id], onDelete: Cascade)
+  url         String
+  title       String?
+  sourceType  String    // e.g. "OFFICIAL_FACULTY_PAGE", "LAB_PAGE", "OPENALEX", "GRANT_DATABASE"
+  extractedAt DateTime  @default(now())
+}
+
+model SuppressionList {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  reason    String
+  createdAt DateTime @default(now())
+}
+
+model DomainSession {
+  id               String   @id @default(cuid())
+  domain           String   @unique
+  storageStateJson Json     // Saved Playwright cookies / storage state
+  userAgent        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  expiresAt        DateTime?
+}
+
+model VerificationChallenge {
+  id             String          @id @default(cuid())
+  url            String
+  domain         String
+  challengeType  String          // "CLOUDFLARE", "RECAPTCHA", "EMAIL_REVEAL", "SECURITY_GATE"
+  autoAttempted  Boolean         @default(false)
+  autoSuccess    Boolean         @default(false)
+  status         ChallengeStatus @default(PENDING_AUTO)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
