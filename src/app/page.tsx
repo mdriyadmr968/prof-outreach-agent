@@ -7,8 +7,6 @@ import {
   Sparkles, 
   Send, 
   Clock, 
-  CheckCircle2, 
-  AlertCircle, 
   ArrowRight, 
   Search,
   ExternalLink,
@@ -38,23 +36,45 @@ interface ProfessorItem {
   outreach?: { status: string; subject: string }[];
 }
 
+interface StudentProfile {
+  name: string;
+  university: string;
+  degree: string;
+  cgpa: number;
+  thesisTitle: string;
+  skills: string[];
+}
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [recentProfessors, setRecentProfessors] = useState<ProfessorItem[]>([]);
+  const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [statsRes, profsRes] = await Promise.all([
+        const [statsRes, profsRes, profileRes] = await Promise.all([
           fetch("/api/stats"),
           fetch("/api/professors"),
+          fetch("/api/profile"),
         ]);
         const statsData = await statsRes.json();
         const profsData = await profsRes.json();
+        const profileData = await profileRes.json();
 
         if (statsData.success) setStats(statsData.stats);
         if (profsData.success) setRecentProfessors(profsData.data.slice(0, 5));
+        if (profileData.user && profileData.profile) {
+          setStudentProfile({
+            name: profileData.user.name,
+            university: profileData.profile.university,
+            degree: profileData.profile.degree,
+            cgpa: profileData.profile.cgpa,
+            thesisTitle: profileData.profile.thesisTitle,
+            skills: profileData.profile.skills || [],
+          });
+        }
       } catch (err) {
         console.error("Dashboard fetch error:", err);
       } finally {
@@ -192,14 +212,20 @@ export default function DashboardPage() {
           <div className="space-y-3 text-sm">
             <div>
               <span className="text-xs font-medium text-slate-400 block uppercase">Student</span>
-              <span className="font-semibold text-slate-800">Mohammad Syied Bin Salim</span>
-              <span className="text-xs text-slate-500 block">Port City International University, Bangladesh</span>
+              <span className="font-semibold text-slate-800">
+                {studentProfile?.name || "Mohammad Syied Bin Salim"}
+              </span>
+              <span className="text-xs text-slate-500 block">
+                {studentProfile?.university || "Port City International University, Bangladesh"}
+              </span>
             </div>
 
             <div className="grid grid-cols-2 gap-2 pt-1">
               <div>
                 <span className="text-xs font-medium text-slate-400 block uppercase">CGPA</span>
-                <span className="font-semibold text-slate-800">3.35 / 4.0</span>
+                <span className="font-semibold text-slate-800">
+                  {studentProfile?.cgpa ? `${studentProfile.cgpa} / 4.0` : "3.35 / 4.0"}
+                </span>
               </div>
               <div>
                 <span className="text-xs font-medium text-slate-400 block uppercase">Target Degree</span>
@@ -212,27 +238,34 @@ export default function DashboardPage() {
                 Undergraduate Thesis
               </span>
               <p className="text-xs font-medium text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200/60 leading-relaxed">
-                &ldquo;Early Prediction of Chronic Kidney Disease Using Machine Learning and Deep Learning&rdquo;
+                &ldquo;{studentProfile?.thesisTitle || "Early Prediction of Chronic Kidney Disease Using Machine Learning and Deep Learning"}&rdquo;
               </p>
             </div>
 
             <div className="pt-2">
               <span className="text-xs font-medium text-slate-400 block uppercase mb-1.5">
-                Strategic Advantage
+                Configured Skills &amp; Strengths
               </span>
               <div className="flex flex-wrap gap-1.5">
-                <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-xs font-medium border border-indigo-100">
-                  ML / Neural Networks
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-medium border border-blue-100">
-                  Full-Stack Next.js / TypeScript
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-xs font-medium border border-emerald-100">
-                  Clinical Data Preprocessing
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-xs font-medium border border-purple-100">
-                  PostgreSQL / Lab Systems
-                </span>
+                {studentProfile?.skills && studentProfile.skills.length > 0 ? (
+                  studentProfile.skills.slice(0, 6).map((skill, i) => (
+                    <span
+                      key={i}
+                      className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-xs font-medium border border-indigo-100"
+                    >
+                      {skill}
+                    </span>
+                  ))
+                ) : (
+                  <>
+                    <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-xs font-medium border border-indigo-100">
+                      Machine Learning
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-medium border border-blue-100">
+                      Full-Stack TypeScript
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>

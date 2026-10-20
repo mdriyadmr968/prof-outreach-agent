@@ -3,20 +3,46 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { 
-  Users, 
-  Search, 
   Filter, 
   Mail, 
-  CheckCircle2, 
-  AlertCircle, 
   ExternalLink,
   ChevronDown,
-  ChevronUp,
-  Award
+  ChevronUp
 } from "lucide-react";
 
+interface PublicationItem {
+  id: string;
+  title: string;
+  year?: number | null;
+  url?: string | null;
+}
+
+interface ProfessorCRMItem {
+  id: string;
+  name: string;
+  email?: string | null;
+  emailConfidence: string;
+  profileUrl: string;
+  university: {
+    name: string;
+    country: string;
+    outreachArchetype: string;
+  };
+  opportunity?: {
+    totalScore: number;
+    tier: string;
+    reasoning?: string | null;
+    potentialConcerns?: string | null;
+  } | null;
+  publications?: PublicationItem[];
+  outreach?: {
+    status: string;
+    subject: string;
+  }[];
+}
+
 export default function ProfessorsPage() {
-  const [professors, setProfessors] = useState<any[]>([]);
+  const [professors, setProfessors] = useState<ProfessorCRMItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCountry, setSelectedCountry] = useState<string>("");
   const [selectedTier, setSelectedTier] = useState<string>("");
@@ -220,13 +246,13 @@ export default function ProfessorsPage() {
                             Associated Publications:
                           </span>
                           <div className="space-y-1.5">
-                            {prof.publications.map((pub: any) => (
+                            {prof.publications.map((pub) => (
                               <div
                                 key={pub.id}
                                 className="p-2 bg-white rounded-lg border border-slate-200/60 flex justify-between items-center"
                               >
                                 <span className="font-medium text-slate-800">
-                                  {pub.title} ({pub.year})
+                                  {pub.title} {pub.year ? `(${pub.year})` : ""}
                                 </span>
                                 {pub.url && (
                                   <a
@@ -246,7 +272,7 @@ export default function ProfessorsPage() {
 
                       <div className="pt-2 flex justify-end">
                         <Link
-                          href={`/analyze`}
+                          href={`/analyze?url=${encodeURIComponent(prof.profileUrl)}&name=${encodeURIComponent(prof.name)}&university=${encodeURIComponent(prof.university.name)}&country=${encodeURIComponent(prof.university.country)}`}
                           className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
                         >
                           Open in Single-Professor Analyzer →

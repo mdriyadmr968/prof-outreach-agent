@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { OutreachStatus, Prisma } from "@prisma/client";
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const status = searchParams.get("status");
+    const status = searchParams.get("status") as OutreachStatus | null;
 
-    const where: any = {};
+    const where: Prisma.OutreachWhereInput = {};
     if (status) {
       where.status = status;
     }
@@ -26,7 +27,8 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, count: outreaches.length, data: outreaches });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to load outreach records";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,30 +1,88 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { 
   Sparkles, 
   Send, 
   CheckCircle2, 
   AlertTriangle, 
-  BookOpen, 
-  DollarSign, 
   Mail, 
-  ExternalLink,
-  ShieldAlert,
-  Clock,
-  Layers,
-  Edit3,
-  RefreshCw
+  ExternalLink, 
+  ShieldAlert, 
+  Clock, 
+  Layers, 
+  Edit3, 
+  RefreshCw 
 } from "lucide-react";
 
-export default function AnalyzePage() {
-  const [url, setUrl] = useState("");
-  const [professorName, setProfessorName] = useState("");
-  const [universityName, setUniversityName] = useState("");
-  const [country, setCountry] = useState("Canada");
+interface PublicationItem {
+  id: string;
+  title: string;
+  publicationYear?: number | null;
+  doi?: string | null;
+  abstract?: string | null;
+}
+
+interface ClaimCitationItem {
+  claim: string;
+  sourceUrl: string;
+  sourceQuote?: string;
+}
+
+interface AnalysisResult {
+  professor: {
+    id: string;
+    name: string;
+    university: string;
+    country: string;
+    outreachArchetype: string;
+    email?: string | null;
+    emailConfidence: string;
+    profileUrl: string;
+    acceptingMastersStatus?: string | null;
+    prospectiveStudentRules?: string | null;
+    requiredSubjectTag?: string | null;
+  };
+  opportunity: {
+    id: string;
+    totalScore: number;
+    tier: string;
+    breakdown: {
+      research: number;
+      technical: number;
+      activity: number;
+      funding: number;
+      supervision: number;
+      international: number;
+      program: number;
+      email: number;
+    };
+    reasoning: string;
+    potentialConcerns: string;
+  };
+  publications: PublicationItem[];
+  outreach: {
+    id: string;
+    subject: string;
+    body: string;
+    wordCount: number;
+    claimCitations?: ClaimCitationItem[];
+    qualityPassed: boolean;
+    qualityNotes: string[];
+  };
+}
+
+function AnalyzeContent() {
+  const searchParams = useSearchParams();
+
+  const [url, setUrl] = useState(() => searchParams.get("url") || "");
+  const [professorName, setProfessorName] = useState(() => searchParams.get("name") || "");
+  const [universityName, setUniversityName] = useState(() => searchParams.get("university") || "");
+  const [country, setCountry] = useState(() => searchParams.get("country") || "Canada");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<any | null>(null);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
 
   // Email draft state for editing
   const [editableSubject, setEditableSubject] = useState("");
@@ -62,8 +120,9 @@ export default function AnalyzePage() {
       setResult(data.data);
       setEditableSubject(data.data.outreach.subject);
       setEditableBody(data.data.outreach.body);
-    } catch (err: any) {
-      setError(err.message || "An error occurred during analysis.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "An error occurred during analysis.";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -103,8 +162,9 @@ export default function AnalyzePage() {
       }
 
       setSendSuccess(data.message);
-    } catch (err: any) {
-      setError(err.message || "Could not complete send action.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Could not complete send action.";
+      setError(message);
     } finally {
       setSending(false);
     }
@@ -361,34 +421,42 @@ export default function AnalyzePage() {
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5">
                 Verified Publications (OpenAlex / Sources)
               </h3>
-              <div className="space-y-2">
-                {result.publications.map((pub: any) => (
-                  <div
-                    key={pub.id}
-                    className="p-3 rounded-lg border border-slate-100 bg-slate-50 text-xs flex justify-between items-start gap-4"
-                  >
-                    <div>
-                      <span className="font-semibold text-slate-800">{pub.title}</span>
-                      <span className="text-slate-400 ml-2 font-mono">({pub.publicationYear})</span>
-                      {pub.abstract && (
-                        <p className="text-slate-500 text-[11px] mt-1 line-clamp-2">
-                          {pub.abstract}
-                        </p>
+              {result.publications.length === 0 ? (
+                <p className="text-xs text-slate-500 italic p-3 bg-slate-50 rounded-lg border border-slate-100">
+                  No indexed publications found in OpenAlex. Outreach draft is tailored generally to the professor&apos;s department and lab focus without phantom citations.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {result.publications.map((pub) => (
+                    <div
+                      key={pub.id}
+                      className="p-3 rounded-lg border border-slate-100 bg-slate-50 text-xs flex justify-between items-start gap-4"
+                    >
+                      <div>
+                        <span className="font-semibold text-slate-800">{pub.title}</span>
+                        {pub.publicationYear && (
+                          <span className="text-slate-400 ml-2 font-mono">({pub.publicationYear})</span>
+                        )}
+                        {pub.abstract && (
+                          <p className="text-slate-500 text-[11px] mt-1 line-clamp-2">
+                            {pub.abstract}
+                          </p>
+                        )}
+                      </div>
+                      {pub.doi && (
+                        <a
+                          href={`https://doi.org/${pub.doi}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-indigo-600 hover:text-indigo-800 shrink-0 mt-0.5"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
                       )}
                     </div>
-                    {pub.doi && (
-                      <a
-                        href={`https://doi.org/${pub.doi}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-indigo-600 hover:text-indigo-800 shrink-0 mt-0.5"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                    )}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -450,7 +518,7 @@ export default function AnalyzePage() {
                 Verified Grounded Claims (Hallucination Guard):
               </span>
               <div className="flex flex-wrap gap-2">
-                {result.outreach.claimCitations?.map((c: any, idx: number) => (
+                {result.outreach.claimCitations?.map((c, idx) => (
                   <span
                     key={idx}
                     className="inline-flex items-center space-x-1 text-[11px] px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium"
@@ -500,5 +568,13 @@ export default function AnalyzePage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AnalyzePage() {
+  return (
+    <Suspense fallback={<div className="py-20 text-center text-sm text-slate-400">Loading analyzer...</div>}>
+      <AnalyzeContent />
+    </Suspense>
   );
 }

@@ -45,11 +45,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Email sent to ${outreach.emailTo}!`,
+      message: result.message,
       data: result,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to send email";
     console.error("[POST /api/send] error:", err);
-    return NextResponse.json({ error: err.message || "Failed to send email" }, { status: 400 });
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

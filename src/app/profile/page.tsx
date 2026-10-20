@@ -2,18 +2,44 @@
 
 import { useEffect, useState } from "react";
 import { 
-  UserCircle, 
   Save, 
   CheckCircle2, 
   BookOpen, 
   Code2, 
   Globe, 
-  DollarSign,
-  GraduationCap
+  GraduationCap,
+  Sparkles
 } from "lucide-react";
 
+interface ResearchInterestItem {
+  name: string;
+  weight?: number;
+}
+
+interface UserProfileData {
+  id: string;
+  degree: string;
+  university: string;
+  graduationYear: number;
+  cgpa: number;
+  thesisTitle: string;
+  thesisAbstract?: string | null;
+  thesisMethods: string[];
+  skills: string[];
+  researchInterests: (ResearchInterestItem | string)[];
+  targetCountries: string[];
+  fullyFundedOnly: boolean;
+  acceptTuitionWaiver: boolean;
+}
+
+interface ApiResponse {
+  user?: { name: string; email: string };
+  profile?: UserProfileData;
+  error?: string;
+  success?: boolean;
+}
+
 export default function ProfilePage() {
-  const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -28,6 +54,7 @@ export default function ProfilePage() {
   const [thesisAbstract, setThesisAbstract] = useState("");
   const [methods, setMethods] = useState("");
   const [skills, setSkills] = useState("");
+  const [researchInterests, setResearchInterests] = useState("");
   const [targetCountries, setTargetCountries] = useState("");
   const [fullyFundedOnly, setFullyFundedOnly] = useState(true);
   const [acceptTuitionWaiver, setAcceptTuitionWaiver] = useState(true);
@@ -36,9 +63,8 @@ export default function ProfilePage() {
     async function loadProfile() {
       try {
         const res = await fetch("/api/profile");
-        const data = await res.json();
+        const data: ApiResponse = await res.json();
         if (data.profile) {
-          setProfile(data.profile);
           setName(data.user?.name || "Mohammad Syied Bin Salim");
           setDegree(data.profile.degree);
           setUniversity(data.profile.university);
@@ -48,6 +74,12 @@ export default function ProfilePage() {
           setThesisAbstract(data.profile.thesisAbstract || "");
           setMethods(data.profile.thesisMethods?.join(", ") || "");
           setSkills(data.profile.skills?.join(", ") || "");
+
+          const interestNames = (data.profile.researchInterests || []).map((item) =>
+            typeof item === "string" ? item : item.name
+          );
+          setResearchInterests(interestNames.join(", "));
+
           setTargetCountries(data.profile.targetCountries?.join(", ") || "");
           setFullyFundedOnly(data.profile.fullyFundedOnly);
           setAcceptTuitionWaiver(data.profile.acceptTuitionWaiver);
@@ -67,25 +99,33 @@ export default function ProfilePage() {
     setSuccess(false);
 
     try {
+      const interestsArray = researchInterests
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((name) => ({ name, weight: 10 }));
+
       const res = await fetch("/api/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          degree,
-          university,
+          name: name.trim(),
+          degree: degree.trim(),
+          university: university.trim(),
           graduationYear,
           cgpa,
-          thesisTitle,
-          thesisAbstract,
+          thesisTitle: thesisTitle.trim(),
+          thesisAbstract: thesisAbstract.trim(),
           thesisMethods: methods.split(",").map((s) => s.trim()).filter(Boolean),
           skills: skills.split(",").map((s) => s.trim()).filter(Boolean),
+          researchInterests: interestsArray,
           targetCountries: targetCountries.split(",").map((s) => s.trim()).filter(Boolean),
           fullyFundedOnly,
           acceptTuitionWaiver,
         }),
       });
 
-      const data = await res.json();
+      const data: ApiResponse = await res.json();
       if (data.success) {
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
@@ -132,9 +172,11 @@ export default function ProfilePage() {
               <label className="block text-xs font-semibold text-slate-600 mb-1">Full Name</label>
               <input
                 type="text"
-                disabled
+                required
                 value={name}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700"
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Jane Doe"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs"
               />
             </div>
             <div>
@@ -143,6 +185,7 @@ export default function ProfilePage() {
                 type="text"
                 value={degree}
                 onChange={(e) => setDegree(e.target.value)}
+                placeholder="e.g. BSc in Computer Science and Engineering"
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs"
               />
             </div>
@@ -155,6 +198,7 @@ export default function ProfilePage() {
                 type="text"
                 value={university}
                 onChange={(e) => setUniversity(e.target.value)}
+                placeholder="e.g. University of Waterloo"
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs"
               />
             </div>
@@ -167,6 +211,30 @@ export default function ProfilePage() {
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs"
               />
             </div>
+          </div>
+        </div>
+
+        {/* Research Interests */}
+        <div className="space-y-4 pt-2">
+          <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-2 border-b border-slate-100 pb-2">
+            <Sparkles className="w-4 h-4 text-indigo-600" />
+            <span>Target Research Interests</span>
+          </h2>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">
+              Research Domains &amp; Topics (Comma-separated)
+            </label>
+            <input
+              type="text"
+              value={researchInterests}
+              onChange={(e) => setResearchInterests(e.target.value)}
+              placeholder="Machine Learning, Healthcare AI, Computer Vision, Distributed Systems"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs"
+            />
+            <span className="text-[11px] text-slate-400 mt-1 block">
+              Used to match professors in OpenAlex and dynamically score thematic synergy.
+            </span>
           </div>
         </div>
 
@@ -183,6 +251,7 @@ export default function ProfilePage() {
               type="text"
               value={thesisTitle}
               onChange={(e) => setThesisTitle(e.target.value)}
+              placeholder="e.g. Early Risk Prediction Using Deep Neural Networks"
               className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs"
             />
           </div>
@@ -193,6 +262,7 @@ export default function ProfilePage() {
               rows={3}
               value={thesisAbstract}
               onChange={(e) => setThesisAbstract(e.target.value)}
+              placeholder="Brief summary of your undergraduate research methodology and key results..."
               className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs leading-relaxed"
             />
           </div>
@@ -230,7 +300,7 @@ export default function ProfilePage() {
               className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs"
             />
             <span className="text-[11px] text-slate-400 mt-1 block">
-              Highlighting both ML modeling and full-stack software development gives applied labs a strong incentive to recruit you.
+              Highlighting both research modeling and software development gives applied labs a strong incentive to recruit you.
             </span>
           </div>
         </div>
@@ -250,6 +320,7 @@ export default function ProfilePage() {
               type="text"
               value={targetCountries}
               onChange={(e) => setTargetCountries(e.target.value)}
+              placeholder="Canada, Germany, USA, South Korea, Sweden, Finland"
               className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs"
             />
           </div>

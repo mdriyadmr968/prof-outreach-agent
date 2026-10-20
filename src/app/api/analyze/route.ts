@@ -4,7 +4,7 @@ import { PlaywrightFetcher } from "@/lib/scraper/playwright-fetcher";
 import { OpenAlexService } from "@/lib/academic/openalex";
 import { OpportunityScorer } from "@/lib/ai/opportunity-scorer";
 import { EmailGenerator } from "@/lib/ai/email-generator";
-import { OutreachArchetype, EmailConfidenceStatus, AcceptingStatus } from "@prisma/client";
+import { OutreachArchetype, EmailConfidenceStatus, AcceptingStatus, Prisma } from "@prisma/client";
 
 export async function POST(req: NextRequest) {
   try {
@@ -84,21 +84,8 @@ export async function POST(req: NextRequest) {
     });
 
     // 4. Fetch Publications via OpenAlex
-    let openAlexAuthor = await OpenAlexService.searchAuthor(professorName, universityName);
-    let publications = openAlexAuthor ? await OpenAlexService.getRecentWorks(openAlexAuthor.id, 5) : [];
-
-    // Fallback if OpenAlex had 0 works: parse from webpage text if available
-    if (publications.length === 0) {
-      publications = [
-        {
-          id: "web-1",
-          title: "Deep Learning Approaches for Clinical Decision Support and Risk Stratification",
-          publicationYear: new Date().getFullYear() - 1,
-          citedByCount: 15,
-          concepts: [{ displayName: "Machine Learning", score: 0.9 }],
-        },
-      ];
-    }
+    const openAlexAuthor = await OpenAlexService.searchAuthor(professorName, universityName);
+    const publications = openAlexAuthor ? await OpenAlexService.getRecentWorks(openAlexAuthor.id, 5) : [];
 
     // Best email found
     const bestEmailObj = pageData.emailsFound.sort((a, b) => b.confidence - a.confidence)[0];
@@ -126,8 +113,8 @@ export async function POST(req: NextRequest) {
       fundingEvidenceText: pageData.fundingEvidence,
     });
 
-    // 6. Generate Personalized Email Draft
-    const emailDraft = EmailGenerator.generateDraft({
+    // 6. Generate Personalized Email Draft (AI Powered + Dynamic Grounded Fallback)
+    const emailDraft = await EmailGenerator.generateDraft({
       profile: user.academicProfile,
       professorName,
       universityName,
@@ -240,7 +227,7 @@ export async function POST(req: NextRequest) {
         status: "DRAFT",
         qualityPassed: emailDraft.qualityPassed,
         qualityNotes: emailDraft.qualityFeedback.join("; "),
-        claimCitations: emailDraft.claimCitations as any,
+        claimCitations: emailDraft.claimCitations as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -289,8 +276,9 @@ export async function POST(req: NextRequest) {
         },
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to analyze page";
     console.error("[POST /api/analyze] error:", error);
-    return NextResponse.json({ error: error.message || "Failed to analyze page" }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

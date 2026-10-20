@@ -1,25 +1,40 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { 
   Send, 
   Clock, 
   CheckCircle2, 
   Mail, 
-  AlertCircle, 
-  ArrowRight,
-  Calendar,
-  MessageSquare,
-  Trash2
+  Calendar, 
+  Trash2 
 } from "lucide-react";
 
+interface OutreachRecord {
+  id: string;
+  emailTo: string;
+  subject: string;
+  body: string;
+  status: string;
+  sentAt?: string | null;
+  scheduledFor?: string | null;
+  followUpDate?: string | null;
+  professor: {
+    name: string;
+    university: {
+      name: string;
+      country: string;
+    };
+  };
+}
+
 export default function OutreachPage() {
-  const [outreaches, setOutreaches] = useState<any[]>([]);
+  const [outreaches, setOutreaches] = useState<OutreachRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
-  async function loadOutreaches() {
+  const loadOutreaches = useCallback(async () => {
     try {
       setLoading(true);
       const url = filterStatus ? `/api/outreach?status=${filterStatus}` : `/api/outreach`;
@@ -33,10 +48,28 @@ export default function OutreachPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [filterStatus]);
 
   useEffect(() => {
-    loadOutreaches();
+    let ignore = false;
+    const url = filterStatus ? `/api/outreach?status=${filterStatus}` : `/api/outreach`;
+
+    fetch(url)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!ignore && data.success) {
+          setOutreaches(data.data);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error("Outreach fetch error:", err);
+        if (!ignore) setLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, [filterStatus]);
 
   async function handleSendNow(id: string) {
@@ -53,8 +86,9 @@ export default function OutreachPage() {
       } else {
         alert(data.error || "Sending failed");
       }
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Sending failed";
+      alert(message);
     }
   }
 
@@ -63,8 +97,9 @@ export default function OutreachPage() {
     try {
       await fetch(`/api/outreach/${id}`, { method: "DELETE" });
       loadOutreaches();
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Deletion failed";
+      alert(message);
     }
   }
 

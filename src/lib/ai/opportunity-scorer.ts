@@ -21,9 +21,14 @@ export interface ScoreBreakdown {
   }[];
 }
 
+interface StudentResearchInterest {
+  name: string;
+  weight?: number;
+}
+
 export class OpportunityScorer {
   /**
-   * Calculates a granular 0-100 score based on Section 12 specifications
+   * Calculates a granular 0-100 score dynamically grounded in the student's actual profile
    */
   public static calculateScore(params: {
     profile: AcademicProfile;
@@ -41,7 +46,7 @@ export class OpportunityScorer {
       profile,
       country,
       outreachArchetype,
-      researchInterests,
+      researchInterests: profInterests,
       webText,
       publications,
       emailConfidence,
@@ -50,86 +55,93 @@ export class OpportunityScorer {
     } = params;
 
     const lowerWeb = webText.toLowerCase();
-    const studentInterests = (profile.researchInterests as any[]) || [];
-    const thesisText = `${profile.thesisTitle} ${profile.thesisAbstract || ""}`.toLowerCase();
-    const skills = profile.skills.map((s) => s.toLowerCase());
+
+    // 1. Normalize student's research interests from profile
+    const rawInterests = (profile.researchInterests as unknown as (StudentResearchInterest | string)[]) || [];
+    const studentInterests: string[] = rawInterests.map((item) =>
+      typeof item === "string" ? item.toLowerCase() : item.name?.toLowerCase() || ""
+    ).filter(Boolean);
+
+    const thesisTitleLower = (profile.thesisTitle || "").toLowerCase();
+    const thesisAbstractLower = (profile.thesisAbstract || "").toLowerCase();
+    const fullThesisText = `${thesisTitleLower} ${thesisAbstractLower}`;
 
     // 1. Research Relevance (max 30)
-    let researchScore = 8; // baseline
+    let researchScore = 6; // baseline
     const matchedTopics: string[] = [];
 
-    // Check thesis topic alignment (e.g., healthcare AI, clinical prediction, disease prediction, ML/DL)
-    if (
-      thesisText.includes("kidney") ||
-      thesisText.includes("chronic") ||
-      thesisText.includes("disease") ||
-      thesisText.includes("health") ||
-      thesisText.includes("clinical") ||
-      thesisText.includes("medical")
-    ) {
-      if (
-        lowerWeb.includes("health") ||
-        lowerWeb.includes("clinical") ||
-        lowerWeb.includes("medical") ||
-        lowerWeb.includes("biomedical") ||
-        lowerWeb.includes("patient") ||
-        lowerWeb.includes("disease")
-      ) {
-        researchScore += 14;
-        matchedTopics.push("Healthcare / Clinical AI");
+    // Check overlap with professor's OpenAlex topics or stated interests
+    for (const interest of profInterests) {
+      const lowerProfInt = interest.toLowerCase();
+      // Match against student research interests
+      const matchedInterest = studentInterests.find(
+        (si) => lowerProfInt.includes(si) || si.includes(lowerProfInt)
+      );
+      if (matchedInterest) {
+        researchScore += 6;
+        if (!matchedTopics.includes(interest)) matchedTopics.push(interest);
+      }
+      // Match against thesis
+      if (fullThesisText.includes(lowerProfInt) || lowerProfInt.split(" ").some((w) => w.length > 4 && fullThesisText.includes(w))) {
+        researchScore += 5;
+        if (!matchedTopics.includes(interest)) matchedTopics.push(interest);
       }
     }
 
-    if (
-      lowerWeb.includes("machine learning") ||
-      lowerWeb.includes("deep learning") ||
-      lowerWeb.includes("artificial intelligence") ||
-      lowerWeb.includes("data science")
-    ) {
-      researchScore += 8;
-      matchedTopics.push("Machine Learning / Deep Learning");
+    // Check student interests appearing on professor webpage
+    for (const interest of studentInterests) {
+      if (lowerWeb.includes(interest)) {
+        researchScore += 4;
+        const capitalized = interest.charAt(0).toUpperCase() + interest.slice(1);
+        if (!matchedTopics.includes(capitalized)) matchedTopics.push(capitalized);
+      }
     }
 
-    researchScore = Math.min(30, researchScore);
+    // Check thesis keywords appearing on professor webpage
+    const thesisKeywords = thesisTitleLower
+      .split(/\s+/)
+      .map((w) => w.replace(/[^a-z0-9]/g, ""))
+      .filter((w) => w.length > 4 && !["using", "based", "study", "analysis", "approach"].includes(w));
+
+    let thesisHits = 0;
+    for (const kw of thesisKeywords) {
+      if (lowerWeb.includes(kw)) {
+        thesisHits++;
+      }
+    }
+    if (thesisHits >= 2) {
+      researchScore += 6;
+    } else if (thesisHits === 1) {
+      researchScore += 3;
+    }
+
+    researchScore = Math.min(30, Math.max(6, researchScore));
 
     // 2. Technical Overlap (max 15)
-    let technicalScore = 0;
+    let technicalScore = 4;
     const matchedMethods: string[] = [];
-    const methodsToCheck = [
-      "python",
-      "deep learning",
-      "neural network",
-      "machine learning",
-      "xgboost",
-      "random forest",
-      "classification",
-      "prediction",
-      "preprocessing",
-      "transformer",
-      "pytorch",
-      "tensorflow",
-    ];
 
-    for (const m of methodsToCheck) {
-      if (lowerWeb.includes(m)) {
-        technicalScore += 2;
-        matchedMethods.push(m);
+    // Check student's declared thesis methods
+    const studentMethods = (profile.thesisMethods || []).map((m) => m.toLowerCase());
+    for (const method of studentMethods) {
+      if (method.length > 2 && lowerWeb.includes(method)) {
+        technicalScore += 3;
+        const capitalized = method.charAt(0).toUpperCase() + method.slice(1);
+        if (!matchedMethods.includes(capitalized)) matchedMethods.push(capitalized);
       }
     }
 
-    // Full-stack engineering bonus (building lab tools / clinical web platforms)
-    if (
-      lowerWeb.includes("software") ||
-      lowerWeb.includes("system") ||
-      lowerWeb.includes("platform") ||
-      lowerWeb.includes("tool") ||
-      lowerWeb.includes("application") ||
-      lowerWeb.includes("benchmark")
-    ) {
-      technicalScore += 3;
-      matchedMethods.push("Lab System & Web Platform Engineering");
+    // Check student's declared technical skills
+    const studentSkills = (profile.skills || []).map((s) => s.toLowerCase());
+    for (const skill of studentSkills) {
+      if (skill.length > 2 && lowerWeb.includes(skill)) {
+        technicalScore += 2;
+        const capitalized = skill.charAt(0).toUpperCase() + skill.slice(1);
+        if (!matchedMethods.includes(capitalized)) matchedMethods.push(capitalized);
+      }
     }
-    technicalScore = Math.min(15, Math.max(5, technicalScore));
+
+    technicalScore = Math.min(15, Math.max(4, technicalScore));
 
     // 3. Recent Activity (max 10)
     let activityScore = 4;
@@ -150,14 +162,16 @@ export class OpportunityScorer {
       if (lowerWeb.includes("research assistant") || lowerWeb.includes("ra position") || lowerWeb.includes("stipend")) {
         fundingScore = 20;
       }
-    } else if (outreachArchetype === OutreachArchetype.PROFESSOR_LED && (country === "Canada" || country === "South Korea")) {
+    } else if (outreachArchetype === OutreachArchetype.PROFESSOR_LED && (country === "Canada" || country === "South Korea" || country === "USA")) {
       fundingScore = 14; // In Canada & South Korea, CS thesis Master's are funded by default
     } else if (outreachArchetype === OutreachArchetype.CENTRAL_HIWI) {
       fundingScore = 12; // Tuition-free + paid HiWi opportunities
+    } else if (outreachArchetype === OutreachArchetype.SCHOLARSHIP_LED) {
+      fundingScore = 10;
     }
 
     // 5. Master's Supervision Compatibility (max 10)
-    let supervisionScore = 7;
+    let supervisionScore = 6;
     if (acceptingMastersStatus === "CONFIRMED_OPEN") {
       supervisionScore = 10;
     } else if (acceptingMastersStatus === "PHD_ONLY") {
@@ -165,24 +179,28 @@ export class OpportunityScorer {
     } else if (acceptingMastersStatus === "NOT_ACCEPTING") {
       supervisionScore = 0;
     } else if (lowerWeb.includes("master") || lowerWeb.includes("graduate students")) {
-      supervisionScore = 9;
+      supervisionScore = 8;
     }
 
     // 6. International Student Compatibility (max 5)
-    let internationalScore = 4;
-    if (
-      lowerWeb.includes("international") ||
-      country === "Canada" ||
-      country === "Germany" ||
-      country === "South Korea" ||
-      country === "USA"
-    ) {
+    let internationalScore = 3;
+    const targetCountries = (profile.targetCountries || []).map((c) => c.toLowerCase());
+    if (targetCountries.includes(country.toLowerCase())) {
       internationalScore = 5;
+    } else if (
+      lowerWeb.includes("international") ||
+      ["Canada", "Germany", "South Korea", "USA", "Sweden", "Finland", "UK"].includes(country)
+    ) {
+      internationalScore = 4;
     }
 
     // 7. Program Compatibility (max 5)
     let programScore = 4;
-    if (lowerWeb.includes("computer science") || lowerWeb.includes("informatics") || lowerWeb.includes("engineering")) {
+    const degreeLower = (profile.degree || "").toLowerCase();
+    if (
+      (degreeLower.includes("computer") && (lowerWeb.includes("computer science") || lowerWeb.includes("informatics"))) ||
+      (degreeLower.includes("engineering") && lowerWeb.includes("engineering"))
+    ) {
       programScore = 5;
     }
 
@@ -216,21 +234,30 @@ export class OpportunityScorer {
     else if (totalScore >= 70) tier = "C";
     else if (totalScore >= 60) tier = "D";
 
-    // Publication Relevance Attribution
+    // Dynamic Publication Relevance Attribution
     const matchedPublications = publications.slice(0, 3).map((pub) => {
-      let reason = "Aligns with core machine learning and applied intelligent systems techniques.";
       const lowerTitle = pub.title.toLowerCase();
-      if (
-        lowerTitle.includes("health") ||
-        lowerTitle.includes("clinical") ||
-        lowerTitle.includes("medical") ||
-        lowerTitle.includes("disease") ||
-        lowerTitle.includes("patient")
-      ) {
-        reason = "Direct thematic synergy with your undergraduate thesis in clinical prediction and healthcare AI.";
-      } else if (lowerTitle.includes("deep learning") || lowerTitle.includes("neural")) {
-        reason = "Matches your deep neural network modeling and feature representation experience.";
+      const lowerAbstract = (pub.abstract || "").toLowerCase();
+      const combinedPub = `${lowerTitle} ${lowerAbstract}`;
+
+      // Check overlap with student thesis
+      const pubKeywords = thesisKeywords.filter((k) => combinedPub.includes(k));
+      let reason = "Aligns with your foundational computing and computational research background.";
+
+      if (pubKeywords.length > 0) {
+        reason = `Direct thematic synergy with your thesis focus on [${pubKeywords.join(", ")}].`;
+      } else {
+        const matchingMethod = studentMethods.find((m) => combinedPub.includes(m));
+        if (matchingMethod) {
+          reason = `Employs ${matchingMethod}, directly matching your technical research methods.`;
+        } else {
+          const matchingInterest = studentInterests.find((i) => combinedPub.includes(i));
+          if (matchingInterest) {
+            reason = `Explores topics in ${matchingInterest}, aligning with your stated research directions.`;
+          }
+        }
       }
+
       return {
         title: pub.title,
         year: pub.publicationYear,
@@ -238,7 +265,10 @@ export class OpportunityScorer {
       };
     });
 
-    const reasoning = `Strong research synergy in [${matchedTopics.join(", ")}]. Overlapping technical capabilities: ${matchedMethods.slice(0, 4).join(", ")}. ${recentPubs.length} recent publication(s) within active 3-year window.`;
+    const displayTopics = matchedTopics.length > 0 ? matchedTopics.slice(0, 4).join(", ") : "Computing & AI";
+    const displayMethods = matchedMethods.length > 0 ? matchedMethods.slice(0, 4).join(", ") : "applied software & technical methodologies";
+
+    const reasoning = `Synergy identified in [${displayTopics}]. Overlapping technical capabilities: ${displayMethods}. ${recentPubs.length} recent publication(s) within active window.`;
 
     let potentialConcerns = "";
     if (acceptingMastersStatus === "PHD_ONLY") {

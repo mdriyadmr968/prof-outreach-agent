@@ -56,7 +56,8 @@ export async function GET() {
         interviews: 0,
       },
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to load stats";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { OutreachArchetype, Prisma } from "@prisma/client";
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const country = searchParams.get("country");
     const tier = searchParams.get("tier");
-    const archetype = searchParams.get("archetype");
+    const archetype = searchParams.get("archetype") as OutreachArchetype | null;
 
-    const whereClause: any = {};
+    const whereClause: Prisma.ProfessorWhereInput = {};
     if (country) {
       whereClause.university = { country };
     }
     if (archetype) {
       whereClause.university = {
-        ...whereClause.university,
+        ...(whereClause.university as Prisma.UniversityWhereInput),
         outreachArchetype: archetype,
       };
     }
@@ -44,7 +45,8 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, count: professors.length, data: professors });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to load professors";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -53,7 +53,7 @@ async function runTests() {
 
   // 4. Test Email Generator with Easter-Egg Codeword injection
   console.log("[Test 4] Testing Email Generator with secret subject tag injection...");
-  const emailDraft = EmailGenerator.generateDraft({
+  const emailDraft = await EmailGenerator.generateDraft({
     profile: user.academicProfile,
     professorName: "Dr. Catherine Chen",
     universityName: "University of Toronto",
@@ -79,13 +79,12 @@ async function runTests() {
   }
 
   console.log("\n>>> ALL PIPELINE TESTS PASSED SUCCESSFULLY! <<<");
+  await prisma.$disconnect();
+  process.exit(0);
 }
 
 runTests()
   .catch((e) => {
     console.error("Test failed:", e);
     process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
   });

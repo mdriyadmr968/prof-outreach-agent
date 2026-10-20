@@ -35,6 +35,52 @@ export interface OpenAlexWork {
   concepts: { displayName: string; score: number }[];
 }
 
+interface RawInstitution {
+  id: string;
+  display_name: string;
+  country_code: string;
+  type: string;
+  ror?: string;
+}
+
+interface RawTopic {
+  id: string;
+  display_name: string;
+  subfield?: { display_name?: string };
+  field?: { display_name?: string };
+  score?: number;
+}
+
+interface RawAuthor {
+  id: string;
+  display_name: string;
+  orcid?: string;
+  works_count: number;
+  cited_by_count: number;
+  last_known_institutions?: RawInstitution[];
+  topics?: RawTopic[];
+}
+
+interface RawConcept {
+  display_name: string;
+  score: number;
+}
+
+interface RawWork {
+  id: string;
+  title?: string;
+  publication_year: number;
+  doi?: string;
+  primary_location?: {
+    source?: { display_name?: string };
+    landing_page_url?: string;
+    is_oa?: boolean;
+  };
+  abstract_inverted_index?: Record<string, number[]>;
+  cited_by_count?: number;
+  concepts?: RawConcept[];
+}
+
 export class OpenAlexService {
   private static baseUrl = "https://api.openalex.org";
 
@@ -43,21 +89,21 @@ export class OpenAlexService {
    */
   public static async searchAuthor(name: string, institutionName?: string): Promise<OpenAlexAuthor | null> {
     try {
-      let query = `${this.baseUrl}/authors?search=${encodeURIComponent(name)}`;
+      const query = `${this.baseUrl}/authors?search=${encodeURIComponent(name)}`;
       const res = await fetch(query, {
         headers: { "User-Agent": "ProfOutreachAgent/1.0 (academic-research-assistant)" },
       });
       if (!res.ok) return null;
 
       const data = await res.json();
-      const results = data.results || [];
+      const results: RawAuthor[] = data.results || [];
       if (results.length === 0) return null;
 
       // If institution provided, try to match
       if (institutionName) {
         const lowerInst = institutionName.toLowerCase();
-        const matched = results.find((a: any) =>
-          a.last_known_institutions?.some((inst: any) =>
+        const matched = results.find((a) =>
+          a.last_known_institutions?.some((inst) =>
             inst.display_name?.toLowerCase().includes(lowerInst)
           )
         );
@@ -88,7 +134,8 @@ export class OpenAlexService {
       if (!res.ok) return [];
 
       const data = await res.json();
-      return (data.results || []).map((w: any) => this.formatWork(w));
+      const results: RawWork[] = data.results || [];
+      return results.map((w) => this.formatWork(w));
     } catch (err) {
       console.warn(`[OpenAlex] Works fetch failed for ${authorId}:`, err);
       return [];
@@ -114,14 +161,15 @@ export class OpenAlexService {
       if (!res.ok) return [];
 
       const data = await res.json();
-      return (data.results || []).map((a: any) => this.formatAuthor(a));
+      const results: RawAuthor[] = data.results || [];
+      return results.map((a) => this.formatAuthor(a));
     } catch (err) {
       console.warn(`[OpenAlex] Topic search failed:`, err);
       return [];
     }
   }
 
-  private static formatAuthor(raw: any): OpenAlexAuthor {
+  private static formatAuthor(raw: RawAuthor): OpenAlexAuthor {
     const institution = raw.last_known_institutions?.[0];
     return {
       id: raw.id,
@@ -138,7 +186,7 @@ export class OpenAlexService {
             ror: institution.ror,
           }
         : undefined,
-      topics: (raw.topics || []).slice(0, 5).map((t: any) => ({
+      topics: (raw.topics || []).slice(0, 5).map((t) => ({
         id: t.id,
         displayName: t.display_name,
         subfield: t.subfield?.display_name || "",
@@ -148,13 +196,13 @@ export class OpenAlexService {
     };
   }
 
-  private static formatWork(raw: any): OpenAlexWork {
+  private static formatWork(raw: RawWork): OpenAlexWork {
     // Reconstruct abstract from inverted index if present
     let abstract = "";
     if (raw.abstract_inverted_index) {
       const words: { word: string; pos: number }[] = [];
       for (const [word, positions] of Object.entries(raw.abstract_inverted_index)) {
-        for (const pos of positions as number[]) {
+        for (const pos of positions) {
           words.push({ word, pos });
         }
       }
@@ -174,7 +222,7 @@ export class OpenAlexService {
       },
       abstract: abstract.slice(0, 1000),
       citedByCount: raw.cited_by_count || 0,
-      concepts: (raw.concepts || []).slice(0, 5).map((c: any) => ({
+      concepts: (raw.concepts || []).slice(0, 5).map((c) => ({
         displayName: c.display_name,
         score: c.score,
       })),

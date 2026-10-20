@@ -4,24 +4,36 @@ import { useState } from "react";
 import Link from "next/link";
 import { 
   Search, 
-  Sparkles, 
-  BookOpen, 
-  Globe, 
-  Award, 
   ArrowRight,
-  ExternalLink,
   RefreshCw,
-  Building,
-  GraduationCap
+  Building
 } from "lucide-react";
+
+interface DiscoveredAuthor {
+  openAlexId: string;
+  name: string;
+  orcid?: string;
+  worksCount: number;
+  citedByCount: number;
+  university: string;
+  country: string;
+  outreachArchetype: string;
+  topics: string[];
+  recentPublications: {
+    title: string;
+    year: number;
+    citations: number;
+    url?: string;
+  }[];
+}
 
 export default function DiscoverPage() {
   const [topic, setTopic] = useState("Machine Learning Healthcare");
   const [country, setCountry] = useState("Canada");
-  const [limit, setLimit] = useState(6);
+  const limit = 6;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<DiscoveredAuthor[]>([]);
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -41,8 +53,9 @@ export default function DiscoverPage() {
       }
 
       setResults(data.data || []);
-    } catch (err: any) {
-      setError(err.message || "An error occurred.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "An error occurred.";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -223,7 +236,7 @@ export default function DiscoverPage() {
                   </span>
 
                   <Link
-                    href={`/analyze`}
+                    href={`/analyze?name=${encodeURIComponent(author.name)}&university=${encodeURIComponent(author.university)}&country=${encodeURIComponent(author.country)}`}
                     className="inline-flex items-center space-x-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
                   >
                     <span>Analyze &amp; Draft Email</span>

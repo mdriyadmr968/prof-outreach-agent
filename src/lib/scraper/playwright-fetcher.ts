@@ -1,5 +1,6 @@
-import { chromium, BrowserContext, Page } from "playwright";
+import { chromium, Browser, BrowserContext, Page } from "playwright";
 import { prisma } from "../prisma";
+import { Prisma } from "@prisma/client";
 
 export interface PageExtractResult {
   url: string;
@@ -46,7 +47,9 @@ export class PlaywrightFetcher {
       const session = await prisma.domainSession.findUnique({
         where: { domain },
       });
-      return session?.storageStateJson ? (session.storageStateJson as any) : undefined;
+      return session?.storageStateJson
+        ? (session.storageStateJson as unknown as NonNullable<Parameters<Browser["newContext"]>[0]>["storageState"])
+        : undefined;
     } catch {
       return undefined;
     }
@@ -58,12 +61,12 @@ export class PlaywrightFetcher {
       await prisma.domainSession.upsert({
         where: { domain },
         update: {
-          storageStateJson: storageState as any,
+          storageStateJson: storageState as unknown as Prisma.InputJsonValue,
           updatedAt: new Date(),
         },
         create: {
           domain,
-          storageStateJson: storageState as any,
+          storageStateJson: storageState as unknown as Prisma.InputJsonValue,
         },
       });
     } catch (err) {

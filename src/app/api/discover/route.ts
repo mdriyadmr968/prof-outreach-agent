@@ -82,8 +82,9 @@ export async function POST(req: NextRequest) {
       count: discoveredProfessors.length,
       data: discoveredProfessors,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Discovery search failed";
     console.error("[POST /api/discover] error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

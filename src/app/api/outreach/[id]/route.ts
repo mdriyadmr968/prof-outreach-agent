@@ -20,8 +20,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     });
 
     return NextResponse.json({ success: true, data: updated });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to update outreach record";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -30,7 +31,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const { id } = await params;
     await prisma.outreach.delete({ where: { id } });
     return NextResponse.json({ success: true, message: "Draft deleted" });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to delete outreach record";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
